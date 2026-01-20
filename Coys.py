@@ -1,205 +1,192 @@
 import streamlit as st
-import time
+import hashlib
+import random
+from datetime import date
 
-# --- 1. 페이지 및 세션 상태 설정 ---
+# --- 1. 페이지 설정 ---
 st.set_page_config(
-    page_title="⚽ 나만의 축구 포지션 찾기 Pro",
+    page_title="⚽ 2026 슈퍼루키 데뷔 시뮬레이터",
     page_icon="🏆",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
 
-if 'show_gif_overlay' not in st.session_state:
-    st.session_state.show_gif_overlay = False
-if 'current_gif_url' not in st.session_state:
-    st.session_state.current_gif_url = ""
-
-# --- 2. 커스텀 CSS (수정됨: IMG 태그 방식 적용) ---
+# --- 2. 커스텀 CSS (FIFA 카드/계약서 스타일) ---
 st.markdown("""
     <style>
+    /* 배경: 챔피언스리그 느낌의 짙은 네이비 + 별빛 */
     .stApp {
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        background: radial-gradient(circle at center, #1e3c72 0%, #2a5298 100%);
+        color: white;
     }
     
-    /* --- ✨ 배경 움짤 오버레이 (수정됨) --- */
-    @keyframes magicBackgroundFade {
-        0% { opacity: 0; z-index: 9998; }
-        10% { opacity: 1; z-index: 9998; }
-        80% { opacity: 1; z-index: 9998; }
-        100% { opacity: 0; z-index: -1; pointer-events: none;}
-    }
-    
-    .gif-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: rgba(0,0,0,0.85); /* 배경을 더 어둡게 */
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        animation: magicBackgroundFade 4s forwards ease-in-out;
-    }
-    
-    /* 이미지가 화면 중앙에 예쁘게 뜨도록 설정 */
-    .gif-overlay img {
-        max-width: 90%;
-        max-height: 80%;
-        border-radius: 15px;
-        box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
-        object-fit: contain;
+    /* 타이틀 스타일 */
+    .main-title {
+        font-size: 2.5rem;
+        font-weight: 900;
+        text-align: center;
+        background: -webkit-linear-gradient(#eee, #333);
+        -webkit-background-clip: text;
+        text-shadow: 0 0 20px rgba(255,255,255,0.5);
+        margin-bottom: 30px;
     }
 
-    /* 타이틀 및 카드 스타일 */
-    .title-text {
-        color: #ffffff;
-        text-align: center;
-        font-size: 3rem;
-        font-weight: 800;
-        text-shadow: 2px 2px 10px rgba(0,0,0,0.7);
-        margin-bottom: 20px;
-    }
-    
-    .player-card {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 25px;
+    /* 결과 카드 (선수 카드 느낌) */
+    .scout-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
         padding: 30px;
         text-align: center;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-        border: 4px solid #D4AF37;
-        animation: slideUp 0.8s ease-out;
-        position: relative;
-        z-index: 1;
-    }
-    
-    .match-player-badge {
-        background-color: #D4AF37;
-        color: white;
-        padding: 5px 15px;
-        border-radius: 20px;
-        font-weight: bold;
-        display: inline-block;
-        margin-bottom: 10px;
+        box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
+        animation: flipIn 1s ease-out;
     }
 
-    .position-name {
-        color: #2c3e50;
-        font-size: 2rem;
-        font-weight: 900;
-        margin: 10px 0;
+    .team-logo { font-size: 5rem; margin-bottom: 10px; }
+    .player-name { font-size: 2rem; font-weight: bold; color: #ffeb3b; }
+    .info-label { color: #aaa; font-size: 0.9rem; margin-top: 15px; }
+    .info-value { font-size: 1.5rem; font-weight: bold; color: white; }
+    
+    .stat-box {
+        background: rgba(0,0,0,0.3);
+        border-radius: 10px;
+        padding: 10px;
+        margin-top: 20px;
     }
-    
-    .big-emoji { font-size: 5rem; display: block; }
-    
+
     /* 버튼 스타일 */
     .stButton>button {
         width: 100%;
-        background: linear-gradient(45deg, #ff4b1f, #ff9068);
-        color: white;
-        font-size: 1.2rem;
+        background: linear-gradient(90deg, #FDBB2D 0%, #22C1C3 100%);
+        color: #1a1a1a;
         font-weight: bold;
-        border-radius: 15px;
-        padding: 12px;
         border: none;
+        padding: 15px;
+        font-size: 1.2rem;
+        border-radius: 12px;
+        transition: 0.3s;
     }
-    .stButton>button:hover { transform: scale(1.02); }
-    
-    @keyframes slideUp {
-        0% { opacity: 0; transform: translateY(50px); }
-        100% { opacity: 1; transform: translateY(0); }
+    .stButton>button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+    }
+
+    @keyframes flipIn {
+        from { transform: perspective(400px) rotateX(90deg); opacity: 0; }
+        to { transform: perspective(400px) rotateX(0deg); opacity: 1; }
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 데이터 (수정됨: 작동하는 URL로 교체) ---
-def get_complete_data(number):
-    emoji = "🌟"
-    pos = "나만의 개성파 플레이어"
-    desc = f"등번호 {number}번! 독창적인 스타일의 소유자시군요."
-    player = "Future Star"
-    # 기본 이미지 (축구공)
-    gif_url = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjZnYzJ4d3J5eXhpOHV4eXJ5eXhpOHV4eXJ5eXhpOHV4eXJ5eXhpOCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o6vXUgVMtK64QAezK/giphy.gif"
-
-    if number == 1:
-        emoji, pos = "🧤", "수호신 골키퍼 (GK)"
-        desc = "팀의 최후방을 책임지는 든든한 수문장! 슈퍼세이브!"
-        player = "Lev Yashin / Casillas"
-        # 카시야스 슈퍼세이브
-        gif_url = "https://media.giphy.com/media/l0Iy39YV9VNjGSaY0/giphy.gif"
-    elif number == 4:
-        emoji, pos = "🛡️", "철벽 센터백 (CB)"
-        desc = "수비 라인의 리더! 카리스마로 상대를 제압합니다."
-        player = "Sergio Ramos / Van Dijk"
-        # 라모스
-        gif_url = "https://i.giphy.com/media/3o7TKPjiWjYtS3pA6k/giphy.gif"
-    elif number == 7:
-        emoji, pos = "⚡", "슈퍼스타 크랙 (Winger)"
-        desc = "팀의 상징이자 에이스! 폭발적인 스피드의 소유자."
-        player = "Son Heung-min / Ronaldo"
-        # 손흥민 (찰칵 세리머니 - 조금 더 안정적인 링크)
-        gif_url = "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExeGJ0ZnJ6dXNxdnhxeXJ5eXhpOHV4eXJ5eXhpOHV4eXJ5eXhpOCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0HlM3NfVd0G3j6Za/giphy.gif"
-    elif number == 9:
-        emoji, pos = "🐯", "득점 기계 (ST)"
-        desc = "골 냄새를 맡는 본능적인 스트라이커."
-        player = "Ronaldo (R9) / Haaland"
-        # 호나우두
-        gif_url = "https://media.giphy.com/media/l2JHRhAtnJSDNJ2py/giphy.gif"
-    elif number == 10:
-        emoji, pos = "👑", "축구의 신 (Playmaker)"
-        desc = "설명이 필요 없는 팀의 심장. 마법 같은 플레이."
-        player = "Lionel Messi"
-        # 메시
-        gif_url = "https://media.giphy.com/media/3o6vXI8UXFWXq7jkKI/giphy.gif"
-    elif number == 14:
-        emoji, pos = "💎", "마에스트로"
-        desc = "그라운드 전체를 지휘하는 혁명가."
-        player = "Johan Cruyff"
-        # 크루이프
-        gif_url = "https://media.giphy.com/media/xT1XGVp95GDPgRYm9W/giphy.gif"
+# --- 3. 운명 결정 로직 (이름+생일로 고정된 결과 생성) ---
+def determine_destiny(name, dob):
+    # 입력값을 합쳐서 고유한 시드값 생성
+    seed_string = f"{name}{dob}"
+    # MD5 해시를 사용하여 항상 같은 입력엔 같은 숫자가 나오도록 함
+    hash_obj = hashlib.md5(seed_string.encode())
+    hash_int = int(hash_obj.hexdigest(), 16)
     
-    return emoji, pos, desc, player, gif_url
+    # 1. 포지션 데이터
+    positions = [
+        ("🧤", "GK", "수호신 골키퍼", "팀의 최후방을 책임지는 철벽"),
+        ("🛡️", "CB", "센터백", "피지컬로 상대를 압도하는 통곡의 벽"),
+        ("🏃", "WB", "윙백", "폭발적인 활동량의 측면 지배자"),
+        ("🧠", "CDM", "수비형 미드필더", "경기의 흐름을 읽는 사령관"),
+        ("⚙️", "CM", "중앙 미드필더", "공수를 연결하는 팀의 심장"),
+        ("🎨", "CAM", "공격형 미드필더", "창의적인 패스 마스터"),
+        ("⚡", "LW/RW", "윙 포워드", "상대 수비를 찢는 스피드 레이서"),
+        ("🐯", "ST", "스트라이커", "골 냄새를 맡는 해결사")
+    ]
+    
+    # 2. 팀 데이터 (재미를 위해 다양하게)
+    teams = [
+        ("🇪🇸 레알 마드리드", "Royal White"),
+        ("🇪🇸 바르셀로나", "Blaugrana"),
+        ("🇬🇧 맨체스터 시티", "Sky Blue"),
+        ("🇬🇧 리버풀", "The Reds"),
+        ("🇬🇧 토트넘 홋스퍼", "Spurs"),
+        ("🇬🇧 맨체스터 유나이티드", "Red Devils"),
+        ("🇬🇧 아스날", "Gunners"),
+        ("🇬🇧 첼시", "The Blues"),
+        ("🇩🇪 바이에른 뮌헨", "Die Roten"),
+        ("🇩🇪 도르트문트", "Yellow Black"),
+        ("🇫🇷 PSG", "Les Parisiens"),
+        ("🇮🇹 유벤투스", "Bianconeri"),
+        ("🇮🇹 인테르", "Nerazzurri"),
+        ("🇮🇹 나폴리", "Gli Azzurri"),
+        ("🇰🇷 K리그 올스타", "K-League King")
+    ]
+
+    # 해시값을 이용해 선택
+    pos_idx = hash_int % len(positions)
+    team_idx = (hash_int // 10) % len(teams)
+    
+    # 등번호: 1~99번 중 하나, 단 포지션에 따라 약간의 보정(완전 랜덤보단 그럴싸하게)
+    base_num = (hash_int % 99) + 1
+    # 골키퍼는 1번 확률 높임
+    if positions[pos_idx][1] == "GK" and base_num % 2 == 0: 
+        back_number = 1
+    else:
+        back_number = base_num
+
+    # 연봉 (재미 요소): 10억 ~ 3000억 사이
+    salary = (hash_int % 300) * 10 + 10 
+    
+    return positions[pos_idx], teams[team_idx], back_number, salary
 
 # --- 4. 메인 UI ---
 
-# 움짤 오버레이 출력 (IMG 태그 사용)
-if st.session_state.show_gif_overlay:
-    st.markdown(f"""
-    <div class="gif-overlay">
-        <img src="{st.session_state.current_gif_url}" alt="Player GIF">
-    </div>
-    """, unsafe_allow_html=True)
-    st.session_state.show_gif_overlay = False
+st.markdown('<div class="main-title">⚽ PRO DEBUT SCOUTING</div>', unsafe_allow_html=True)
+st.write("축구 선수로 데뷔한다면? 당신의 이름과 생년월일로 운명의 팀을 확인하세요!")
 
-st.markdown('<div class="title-text">⚽ SOCCER SOUL PRO ⚽</div>', unsafe_allow_html=True)
-
-col1, col2, col3 = st.columns([1, 2, 1])
-
-with col2:
-    choice_num = st.number_input("좋아하는 숫자 (0~99)", min_value=0, max_value=99, value=7)
+# 입력 폼
+with st.form("input_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        name = st.text_input("선수 이름 (Name)", placeholder="예: 손흥민")
+    with col2:
+        dob = st.date_input("생년월일 (Birth Date)", min_value=date(1950, 1, 1), max_value=date(2020, 12, 31), value=date(2000, 1, 1))
     
-    if st.button("🚀 확인하기"):
-        emoji, pos_name, desc, match_player, gif_url = get_complete_data(choice_num)
-        
-        st.session_state.current_gif_url = gif_url
-        st.session_state.show_gif_overlay = True
-        
-        with st.spinner('데이터 분석 중...'):
-             time.sleep(1)
+    submit = st.form_submit_button("✍️ 계약서 서명하고 결과 보기")
 
+# 결과 출력
+if submit:
+    if not name:
+        st.warning("이름을 입력해주세요!")
+    else:
+        # 로직 실행
+        (emoji, pos_code, pos_name, pos_desc), (team_name, team_nick), number, salary = determine_destiny(name, dob)
+        
+        # 로딩 효과
+        with st.spinner('구단 스카우터들과 협상 중입니다... 📞'):
+            import time
+            time.sleep(1.5)
+        
+        st.success(f"축하합니다! {team_name} 구단과 계약을 체결했습니다! 🎉")
+        st.balloons()
+        
+        # 결과 카드 렌더링
         st.markdown(f"""
-        <div class="player-card">
-            <span class="big-emoji">{emoji}</span>
-            <div class="match-player-badge">🔥 {match_player}</div>
-            <div class="position-name">{pos_name}</div>
-            <div class="desc-text">{desc}</div>
+        <div class="scout-card">
+            <div style="color: #bbb; font-size: 0.9rem; margin-bottom: 5px;">OFFICIAL ANNOUNCEMENT</div>
+            <div class="player-name">{name}</div>
+            <div style="color: white; font-size: 1.2rem;">No. {number}</div>
+            
+            <hr style="border: 1px solid rgba(255,255,255,0.2); margin: 20px 0;">
+            
+            <div style="font-size: 4rem; margin-bottom: 10px;">{emoji}</div>
+            <div class="info-value">{pos_name} ({pos_code})</div>
+            <div style="color: #ccc; font-size: 1rem; margin-bottom: 20px;">"{pos_desc}"</div>
+            
+            <div class="stat-box">
+                <div class="info-label">소속 팀 (Team)</div>
+                <div class="info-value" style="color: #4facfe;">{team_name}</div>
+                <div class="info-label">주급 / 연봉 (Market Value)</div>
+                <div class="info-value" style="color: #43e97b;">약 {salary}억 원</div>
+            </div>
+            
+            <div style="margin-top: 25px; font-size: 0.8rem; color: #888;">
+                * 위 결과는 당신의 이름과 생년월일의 기운을 분석한 고정 결과입니다.
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        if choice_num in [7, 9, 10]:
-            st.balloons()
-        else:
-            st.snow()
-            
-        # UI 즉시 갱신을 위해 rerun
-        st.rerun()
