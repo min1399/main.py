@@ -1,152 +1,273 @@
 import streamlit as st
 import hashlib
-from datetime import date
 import time
+import random
+from datetime import date
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
-    page_title="2026 슈퍼루키 스카우팅",
+    page_title="FC 2026 PACK OPENING",
     page_icon="⚽",
     layout="centered"
 )
 
-# --- 2. 디자인 CSS (배경 및 폰트) ---
+# --- 2. FIFA 스타일 CSS (화려함 극대화) ---
 st.markdown("""
     <style>
-    /* 전체 배경: 고급스러운 다크 네이비 그라데이션 */
+    /* 배경: 게임 메뉴 같은 어두운 배경 */
     .stApp {
-        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        background: radial-gradient(circle, #2b0c38 0%, #1a0525 100%);
         color: white;
     }
     
-    /* 텍스트 강조 스타일 */
-    .highlight {
-        color: #FDBB2D;
-        font-weight: bold;
+    /* 폰트 스타일 */
+    h1, h2, h3 { font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
+    
+    /* 카드 디자인 (Ultimate Team 스타일) */
+    .fut-card {
+        background: linear-gradient(180deg, #e6b980 0%, #eacda3 100%);
+        border: 2px solid #f1c40f;
+        border-radius: 20px;
+        padding: 10px;
+        width: 320px;
+        margin: 0 auto;
+        color: #2c3e50;
+        box-shadow: 0 0 50px rgba(241, 196, 15, 0.4);
+        position: relative;
+        text-align: center;
+        animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     }
     
-    /* 카드 컨테이너 스타일 */
-    div[data-testid="stContainer"] {
-        background-color: rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        padding: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+    /* 카드 내부 상단 정보 (OVR, 포지션, 국적, 팀) */
+    .card-top {
+        display: flex;
+        justify-content: flex-start;
+        align-items: flex-start;
+        margin-bottom: -40px;
+        padding-left: 10px;
+        padding-top: 10px;
+        position: relative;
+        z-index: 10;
     }
+    
+    .rating { font-size: 3.5rem; font-weight: 900; line-height: 1; color: #333; }
+    .position { font-size: 1.5rem; font-weight: bold; margin-bottom: 5px; color: #333; }
+    .nation-flag { font-size: 2rem; display: block; margin-bottom: 5px; }
+    .club-logo { width: 40px; display: block; }
+
+    /* 선수 이미지 */
+    .player-face {
+        width: 180px;
+        height: 180px;
+        object-fit: contain;
+        margin-top: 10px;
+        filter: drop-shadow(5px 5px 5px rgba(0,0,0,0.3));
+    }
+
+    /* 이름 */
+    .card-name {
+        font-size: 1.8rem;
+        font-weight: 900;
+        letter-spacing: 1px;
+        margin: 5px 0 10px 0;
+        border-bottom: 2px solid #cca164;
+        color: #333;
+    }
+
+    /* 스탯 그리드 (PAC, SHO, PAS...) */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px 20px;
+        padding: 0 20px 20px 20px;
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #333;
+    }
+    .stat-row { display: flex; justify-content: space-between; }
+    .stat-val { font-weight: 900; }
+    
+    /* 애니메이션 키프레임 */
+    @keyframes popIn {
+        0% { transform: scale(0.1); opacity: 0; }
+        80% { transform: scale(1.05); opacity: 1; }
+        100% { transform: scale(1); }
+    }
+    
+    /* 워크아웃 효과 텍스트 */
+    .walkout-text {
+        font-size: 4rem;
+        font-weight: 900;
+        color: #f1c40f;
+        text-align: center;
+        text-shadow: 0 0 20px #f1c40f;
+        animation: flash 1s infinite alternate;
+    }
+    @keyframes flash { from { opacity: 0.5; } to { opacity: 1; } }
+
+    /* 버튼 스타일 */
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(90deg, #ff00cc, #333399);
+        color: white;
+        font-weight: bold;
+        font-size: 1.5rem;
+        padding: 15px;
+        border: none;
+        border-radius: 50px;
+        box-shadow: 0 0 20px rgba(255, 0, 204, 0.5);
+    }
+    .stButton>button:hover { transform: scale(1.05); }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 데이터 로직 ---
-def determine_destiny(name, dob):
+# --- 3. 데이터 로직 (OVR 및 세부 스탯 생성) ---
+def generate_player_stats(name, dob):
     seed_string = f"{name}{dob}"
     hash_obj = hashlib.md5(seed_string.encode())
-    hash_int = int(hash_obj.hexdigest(), 16)
+    h = int(hash_obj.hexdigest(), 16)
     
-    # 포지션 데이터
-    positions = [
-        ("🧤", "GK", "수호신 골키퍼"),
-        ("🛡️", "CB", "철벽 센터백"),
-        ("⚡", "WB", "스피드 윙백"),
-        ("🧠", "CDM", "사령관 수비형 미드필더"),
-        ("⚙️", "CM", "하트비트 중앙 미드필더"),
-        ("🎨", "CAM", "마에스트로 공격형 미드필더"),
-        ("🚀", "LW/RW", "크랙 윙어"),
-        ("🐯", "ST", "득점기계 스트라이커")
-    ]
+    # 포지션
+    positions = [("ST", "스트라이커"), ("LW", "윙어"), ("RW", "윙어"), ("CAM", "공미"), ("CM", "중미"), ("CDM", "수미"), ("CB", "센터백"), ("LB", "풀백"), ("RB", "풀백"), ("GK", "골키퍼")]
+    pos_code, _ = positions[h % len(positions)]
     
-    # 팀 데이터 (이름, 로고 이미지 URL)
+    # 구단
     teams = [
-        ("맨체스터 유나이티드", "https://upload.wikimedia.org/wikipedia/en/7/7a/Manchester_United_FC_crest.svg"),
-        ("맨체스터 시티", "https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg"),
-        ("리버풀", "https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg"),
-        ("아스날", "https://upload.wikimedia.org/wikipedia/en/5/53/Arsenal_FC.svg"),
-        ("토트넘 홋스퍼", "https://upload.wikimedia.org/wikipedia/en/b/b4/Tottenham_Hotspur.svg"),
-        ("첼시", "https://upload.wikimedia.org/wikipedia/en/c/cc/Chelsea_FC.svg"),
-        ("레알 마드리드", "https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg"),
-        ("바르셀로나", "https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg"),
-        ("바이에른 뮌헨", "https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg"),
+        ("Real Madrid", "https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg"),
+        ("Man City", "https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg"),
+        ("Bayern", "https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg"),
         ("PSG", "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg"),
-        ("유벤투스", "https://upload.wikimedia.org/wikipedia/commons/b/bc/Juventus_FC_2017_icon_%28black%29.svg"),
-        ("K리그 올스타", "https://upload.wikimedia.org/wikipedia/en/thumb/5/54/K_League_Official_Logo.svg/1200px-K_League_Official_Logo.svg.png")
+        ("Liverpool", "https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg")
     ]
+    team_name, team_logo = teams[(h // 10) % len(teams)]
     
-    # 프로필 이미지 (사람 실루엣 아이콘)
-    profile_imgs = [
-        "https://cdn-icons-png.flaticon.com/512/3048/3048122.png", # 남자1
-        "https://cdn-icons-png.flaticon.com/512/3048/3048127.png", # 남자2
-        "https://cdn-icons-png.flaticon.com/512/4140/4140047.png"  # 여자 느낌
-    ]
+    # 국적 (임의)
+    flags = ["🇰🇷", "🇦🇷", "🇵🇹", "🇫🇷", "🇧🇷", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇩🇪", "🇪🇸"]
+    flag = flags[(h // 5) % len(flags)]
+    
+    # OVR (오버롤) - 최소 84 ~ 최대 99 (월드클래스 보장)
+    ovr = 84 + (h % 16)
+    
+    # 세부 스탯 생성 (포지션에 따라 가중치 부여)
+    stats = {}
+    base = ovr - 5 # 기본 베이스
+    
+    if pos_code in ["ST", "LW", "RW"]:
+        stats = {"PAC": base+4, "SHO": base+5, "PAS": base-2, "DRI": base+3, "DEF": base-20, "PHY": base-5}
+    elif pos_code in ["CAM", "CM"]:
+        stats = {"PAC": base, "SHO": base, "PAS": base+5, "DRI": base+4, "DEF": base-5, "PHY": base-5}
+    elif pos_code in ["CDM", "CB", "LB", "RB"]:
+        stats = {"PAC": base-2, "SHO": base-15, "PAS": base, "DRI": base-5, "DEF": base+5, "PHY": base+5}
+    else: # GK
+        stats = {"DIV": base+2, "HAN": base+3, "KIC": base, "REF": base+4, "SPD": base-10, "POS": base+2}
+        
+    # 약간의 랜덤성 추가
+    for k in stats:
+        stats[k] = min(99, max(40, stats[k] + (h % 7) - 3))
 
-    # 해시값으로 랜덤 선택
-    pos_idx = hash_int % len(positions)
-    team_idx = (hash_int // 10) % len(teams)
-    profile_idx = (hash_int // 5) % len(profile_imgs)
-    
-    # 등번호 및 연봉 계산
-    base_num = (hash_int % 99) + 1
-    salary = (hash_int % 500) * 10 + 100 # 최소 100억부터
-    
-    return positions[pos_idx], teams[team_idx], base_num, salary, profile_imgs[profile_idx]
+    # 선수 실루엣 이미지 (워크아웃 느낌)
+    silhouette = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5/3o7TKy7hC4tH6qQe6Q/giphy.gif" # 임시 GIF
+    if ovr >= 90:
+        player_img = "https://cdn-icons-png.flaticon.com/512/3048/3048122.png" # 레전드 느낌
+    else:
+        player_img = "https://cdn-icons-png.flaticon.com/512/166/166344.png" # 일반 느낌
+        
+    return pos_code, team_logo, flag, ovr, stats, player_img
 
-# --- 4. 메인 UI 화면 ---
-st.title("⚽ 2026 슈퍼루키 스카우팅 리포트")
-st.markdown("당신의 이름과 생일로 **운명의 축구 포지션**을 확인하세요!")
+# --- 4. 메인 UI ---
 
-# 1. 입력 폼
-with st.container(border=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        name = st.text_input("선수 이름", placeholder="이름을 입력하세요")
-    with col2:
-        dob = st.date_input("생년월일", min_value=date(1970, 1, 1), value=date(2002, 6, 1))
-    
-    btn = st.button("📝 계약서 서명 및 결과 확인", type="primary")
+st.markdown("<h1 style='text-align: center; color: #f1c40f;'>FC 2026 ULTIMATE PACK</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #aaa;'>이름과 생일을 입력하고 팩을 개봉하세요!</p>", unsafe_allow_html=True)
 
-# 2. 결과 출력
-if btn and name:
-    # 분석 로딩 효과
-    with st.spinner(f"🌍 {name} 선수의 데이터를 빅리그 구단에 전송 중..."):
-        time.sleep(1.5)
+# 입력 폼
+with st.container():
+    c1, c2 = st.columns(2)
+    with c1:
+        name = st.text_input("Player Name", placeholder="SON HEUNG MIN")
+    with c2:
+        dob = st.date_input("Date of Birth", value=date(2000,1,1), min_value=date(1950,1,1))
+
+    # 버튼: 상태 관리를 위해 콜백 대신 if문 처리
+    open_pack = st.button("⚡ OPEN PACK (팩 개봉) ⚡")
+
+# --- 5. 연출 및 결과 (Animation Logic) ---
+if open_pack and name:
+    # 1. 데이터 생성
+    pos, team_logo, flag, ovr, stats, player_img = generate_player_stats(name, dob)
     
-    # 데이터 가져오기
-    (emoji, pos_code, pos_name), (team_name, team_logo), number, salary, profile_url = determine_destiny(name, dob)
+    # 2. 워크아웃 애니메이션 (st.empty 사용)
+    placeholder = st.empty()
     
+    # 단계 1: 터널/스포트라이트 GIF
+    with placeholder.container():
+        st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+        # 터널 느낌의 GIF (외부 소스)
+        st.image("https://media.giphy.com/media/l41YtZOb9EUABfS9O/giphy.gif", caption="WALKOUT...", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    time.sleep(2.5) # 긴장감 조성
+    
+    # 단계 2: 국기 등장
+    with placeholder.container():
+        st.markdown(f"<div class='walkout-text'>{flag}</div>", unsafe_allow_html=True)
+    time.sleep(1.0)
+    
+    # 단계 3: 포지션 등장
+    with placeholder.container():
+        st.markdown(f"<div class='walkout-text'>{pos}</div>", unsafe_allow_html=True)
+    time.sleep(1.0)
+    
+    # 단계 4: 소속팀 로고 등장
+    with placeholder.container():
+        st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+        st.image(team_logo, width=150)
+        st.markdown("</div>", unsafe_allow_html=True)
+    time.sleep(1.2)
+    
+    # 단계 5: 쾅! 카드 공개 (Final Reveal)
+    placeholder.empty() # 기존 내용 지우기
     st.balloons() # 축하 효과
     
-    # --- 결과 카드 섹션 (Streamlit Native 방식) ---
-    st.markdown("### ✅ OFFICIAL ANNOUNCEMENT")
-    
-    # 카드 형태의 컨테이너 생성
-    with st.container(border=True):
+    # 카드 HTML 렌더링
+    stats_html = ""
+    # 포지션이 GK가 아니면 일반 스탯
+    if pos != "GK":
+        s_keys = [("PAC", stats["PAC"]), ("SHO", stats["SHO"]), ("PAS", stats["PAS"]), 
+                  ("DRI", stats["DRI"]), ("DEF", stats["DEF"]), ("PHY", stats["PHY"])]
+    else:
+        s_keys = [("DIV", stats["DIV"]), ("HAN", stats["HAN"]), ("KIC", stats["KIC"]),
+                  ("REF", stats["REF"]), ("SPD", stats["SPD"]), ("POS", stats["POS"])]
+
+    for k, v in s_keys:
+        stats_html += f"<div class='stat-row'><span class='stat-val'>{v}</span> <span style='font-weight:normal;'>{k}</span></div>"
+
+    st.markdown(f"""
+    <div class="fut-card">
+        <div class="card-top">
+            <div style="display:flex; flex-direction:column; align-items:center; width: 60px;">
+                <span class="rating">{ovr}</span>
+                <span class="position">{pos}</span>
+                <span class="nation-flag">{flag}</span>
+                <img src="{team_logo}" class="club-logo">
+            </div>
+            <img src="{player_img}" class="player-face" style="margin-left: 10px;">
+        </div>
         
-        # [상단] 프로필 사진과 이름
-        c1, c2, c3 = st.columns([1, 2, 1])
-        with c2:
-            st.image(profile_url, width=120) # 프로필 이미지
-            st.markdown(f"<h2 style='text-align: center; color: white;'>{name}</h2>", unsafe_allow_html=True)
-            st.markdown(f"<div style='text-align: center; color: #FDBB2D; font-size: 1.2rem; margin-bottom: 20px;'>{emoji} {pos_name}</div>", unsafe_allow_html=True)
+        <div class="card-name">{name.upper()}</div>
+        
+        <div class="stats-grid">
+            {stats_html}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 하단 코멘트
+    time.sleep(0.5)
+    if ovr >= 90:
+        st.success("✨ WALKOUT! WORLD CLASS PLAYER! ✨")
+    elif ovr >= 86:
+        st.info("🔥 BOARDS! TOP TALENT! 🔥")
+    else:
+        st.warning("👍 GOOD PLAYER!")
 
-        st.divider() # 구분선
-
-        # [중단] 팀 정보 (로고 + 팀명)
-        st.markdown("#### 🏆 소속 구단 (Team)")
-        t1, t2 = st.columns([1, 3])
-        with t1:
-            st.image(team_logo, width=70) # 팀 로고 이미지
-        with t2:
-            st.markdown(f"## {team_name}")
-            st.caption("2026-2027 Season Contract")
-
-        st.divider()
-
-        # [하단] 상세 스탯 (등번호, 연봉)
-        s1, s2 = st.columns(2)
-        with s1:
-            st.metric(label="등번호 (Back No.)", value=f"No. {number}")
-        with s2:
-            st.metric(label="추정 이적료 (Value)", value=f"{salary} 억 원")
-
-        # 마지막 멘트
-        st.info(f"🎤 스카우터 코멘트: \"{name} 선수는 {team_name}의 전설이 될 재목입니다!\"")
-
-elif btn and not name:
-    st.warning("⚠️ 이름을 입력해야 계약을 진행할 수 있습니다!")
+elif open_pack and not name:
+    st.error("Please enter a name first!")
