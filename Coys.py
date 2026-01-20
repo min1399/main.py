@@ -10,31 +10,52 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. CSS 스타일링 (터널 주소 교체됨) ---
+# --- 2. CSS 스타일링 (이미지 없이 코드로 구현) ---
 st.markdown("""
     <style>
-    /* 전체 배경 */
+    /* 전체 배경: 어두운 우주 느낌 */
     .stApp {
-        background: radial-gradient(circle at center, #1a0f2e 0%, #0d0612 100%);
+        background: radial-gradient(circle at center, #000000 0%, #1a0f2e 50%, #0d0612 100%);
         color: white;
     }
 
-    /* 🚀 핵심: 터널 애니메이션 (안정적인 Giphy 주소로 변경) */
-    @keyframes tunnelFade {
-        0% { opacity: 1; z-index: 9999; }
-        85% { opacity: 1; z-index: 9999; }
-        100% { opacity: 0; z-index: -1; visibility: hidden; }
+    /* 🚀 핵심: 순수 CSS로 만든 터널/워프 효과 */
+    @keyframes warpEffect {
+        0% { transform: scale(1); opacity: 0; }
+        10% { opacity: 1; }
+        80% { opacity: 1; }
+        100% { transform: scale(4); opacity: 0; }
+    }
+    
+    @keyframes flash {
+        0%, 100% { opacity: 0; }
+        50% { opacity: 0.8; }
     }
 
     .tunnel-overlay {
         position: fixed;
         top: 0; left: 0; width: 100vw; height: 100vh;
-        /* 속도감 있는 터널/워프 효과 GIF */
-        background: url('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjZnYzJ4d3J5eXhpOHV4eXJ5eXhpOHV4eXJ5eXhpOHV4eXJ5eXhpOCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/YTU15FfQJMDWd9QeWz/giphy.gif') no-repeat center center fixed;
-        background-size: cover;
+        z-index: 9999;
         pointer-events: none;
-        animation: tunnelFade 3.5s forwards linear; /* 3.5초 동안 유지 */
+        /* 중앙에서 빛이 뿜어져 나오는듯한 그래디언트 */
+        background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(255,215,0,0.2) 40%, rgba(255,100,0,0.6) 80%, rgba(0,0,0,1) 100%);
+        /* 점점 커지면서 다가오는 애니메이션 */
+        animation: warpEffect 3.5s ease-in-out forwards;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
+    
+    /* 추가적인 번쩍임 효과 */
+    .tunnel-overlay::after {
+        content: '';
+        position: absolute;
+        width: 100%; height: 100%;
+        background: white;
+        animation: flash 0.5s 3 ease-in-out; /* 3번 번쩍임 */
+        opacity: 0;
+    }
+
 
     /* 카드 디자인 */
     .fut-card {
@@ -48,7 +69,8 @@ st.markdown("""
         box-shadow: 0 0 60px rgba(241, 196, 15, 0.6), inset 0 0 20px rgba(255,255,255,0.5);
         text-align: center;
         position: relative;
-        animation: cardPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        animation: cardPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 1;
     }
 
     .card-left-info {
@@ -80,12 +102,26 @@ st.markdown("""
     .stat-val { font-size: 1.3rem; font-weight: 900; margin-right: 8px; }
     .stat-label { font-weight: normal; font-size: 1rem; opacity: 0.8; }
 
-    /* 워크아웃 글자 효과 */
-    .walkout-step {
-        font-size: 5rem; font-weight: 900; color: #f1c40f; text-align: center;
-        text-shadow: 0 0 30px #f1c40f; animation: pulse 0.8s infinite alternate;
-        padding-top: 20vh; /* 화면 중앙쯤에 위치하도록 */
+    /* 워크아웃 글자 효과 (화면 중앙 정렬) */
+    .walkout-container {
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10000; /* 터널보다 위에 */
+        text-align: center;
+        width: 100%;
     }
+    .walkout-step {
+        font-size: 6rem; font-weight: 900; color: #f1c40f;
+        text-shadow: 0 0 50px #f1c40f, 0 0 20px white;
+        animation: pulse 0.8s infinite alternate;
+    }
+    .walkout-img {
+        width: 200px;
+        filter: drop-shadow(0 0 30px #f1c40f);
+        animation: pulse 0.8s infinite alternate;
+    }
+
 
     @keyframes cardPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     @keyframes pulse { from { opacity: 0.7; transform: scale(0.95); } to { opacity: 1; transform: scale(1.05); } }
@@ -125,7 +161,7 @@ def generate_player_data(name, dob):
     else: # GK
         stats = {"DIV": base+2, "HAN": base+2, "KIC": base, "REF": base+4, "SPD": base-15, "POS": base+2}
 
-    # [수정완료] .items()를 사용하여 에러 해결!
+    # 스탯 계산
     for k, v in stats.items():
         stats[k] = min(99, max(50, v + (h % 5) - 2))
         
@@ -149,27 +185,28 @@ with st.container():
         else:
             pos, flag, team_logo, ovr, stats, player_img = generate_player_data(name_input, dob_input)
             
-            # 1. 터널 애니메이션 시작 (화면 전체 덮기)
+            # 1. [핵심] 순수 CSS로 만든 터널 효과 시작
             st.markdown('<div class="tunnel-overlay"></div>', unsafe_allow_html=True)
             
             placeholder = st.empty()
             
-            # 2. 터널 진행 중... (약 2.5초간)
+            # 터널 진행 중... (긴장감 조성)
             time.sleep(2.5)
             
-            # 3. 국기 등장!
-            placeholder.markdown(f"<div class='walkout-step'>{flag}</div>", unsafe_allow_html=True)
+            # 2. 워크아웃 단계별 정보 표시 (화면 중앙)
+            # 국기
+            placeholder.markdown(f"<div class='walkout-container'><div class='walkout-step'>{flag}</div></div>", unsafe_allow_html=True)
             time.sleep(1.0)
             
-            # 4. 포지션 등장!
-            placeholder.markdown(f"<div class='walkout-step'>{pos}</div>", unsafe_allow_html=True)
+            # 포지션
+            placeholder.markdown(f"<div class='walkout-container'><div class='walkout-step'>{pos}</div></div>", unsafe_allow_html=True)
             time.sleep(1.0)
             
-            # 5. 소속팀 등장!
-            placeholder.markdown(f"<div class='walkout-step'><img src='{team_logo}' width='150'></div>", unsafe_allow_html=True)
-            time.sleep(1.0)
+            # 소속팀
+            placeholder.markdown(f"<div class='walkout-container'><img src='{team_logo}' class='walkout-img'></div>", unsafe_allow_html=True)
+            time.sleep(1.2)
             
-            # 6. 최종 카드 공개
+            # 3. 최종 카드 공개
             placeholder.empty()
             st.balloons()
             
