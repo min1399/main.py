@@ -1,7 +1,6 @@
 import streamlit as st
 import hashlib
 import time
-import random
 from datetime import date
 
 # --- 1. 페이지 설정 ---
@@ -11,127 +10,123 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. FIFA 스타일 CSS (화려함 극대화) ---
+# --- 2. CSS 스타일링 (터널 애니메이션 + 카드 디자인) ---
 st.markdown("""
     <style>
-    /* 배경: 게임 메뉴 같은 어두운 배경 */
+    /* 메인 배경: 어두운 게임 대기 화면 느낌 */
     .stApp {
-        background: radial-gradient(circle, #2b0c38 0%, #1a0525 100%);
+        background: radial-gradient(circle at center, #1a0f2e 0%, #0d0612 100%);
         color: white;
     }
-    
-    /* 폰트 스타일 */
-    h1, h2, h3 { font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
-    
-    /* 카드 디자인 (Ultimate Team 스타일) */
+
+    /* --- 🚀 핵심: 배경 터널 애니메이션 --- */
+    @keyframes tunnelFade {
+        0% { opacity: 1; z-index: 9999; }
+        80% { opacity: 1; z-index: 9999; }
+        100% { opacity: 0; z-index: -1; visibility: hidden; }
+    }
+
+    .tunnel-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        /* 안정적인 외부 터널 GIF 소스 사용 */
+        background: url('https://i.pinimg.com/originals/a1/1f/65/a11f654296d4107462cd636967ecba0b.gif') no-repeat center center fixed;
+        background-size: cover;
+        pointer-events: none; /* 클릭 통과 */
+        animation: tunnelFade 3s forwards linear; /* 3초간 지속 후 사라짐 */
+    }
+
+    /* --- FIFA 스타일 카드 디자인 --- */
     .fut-card {
-        background: linear-gradient(180deg, #e6b980 0%, #eacda3 100%);
-        border: 2px solid #f1c40f;
-        border-radius: 20px;
-        padding: 10px;
-        width: 320px;
-        margin: 0 auto;
+        background: linear-gradient(180deg, #f8e6b8 0%, #eacda3 80%, #d4af37 100%);
+        border: 3px solid #f1c40f;
+        border-radius: 25px;
+        padding: 15px;
+        width: 340px;
+        margin: 20px auto;
         color: #2c3e50;
-        box-shadow: 0 0 50px rgba(241, 196, 15, 0.4);
-        position: relative;
+        box-shadow: 0 0 60px rgba(241, 196, 15, 0.6), inset 0 0 20px rgba(255,255,255,0.5);
         text-align: center;
-        animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    }
-    
-    /* 카드 내부 상단 정보 (OVR, 포지션, 국적, 팀) */
-    .card-top {
-        display: flex;
-        justify-content: flex-start;
-        align-items: flex-start;
-        margin-bottom: -40px;
-        padding-left: 10px;
-        padding-top: 10px;
         position: relative;
-        z-index: 10;
+        animation: cardPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-    
-    .rating { font-size: 3.5rem; font-weight: 900; line-height: 1; color: #333; }
-    .position { font-size: 1.5rem; font-weight: bold; margin-bottom: 5px; color: #333; }
-    .nation-flag { font-size: 2rem; display: block; margin-bottom: 5px; }
-    .club-logo { width: 40px; display: block; }
 
-    /* 선수 이미지 */
+    /* 카드 상단 정보 영역 (OVR, 포지션 등) */
+    .card-left-info {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 2;
+    }
+    .rating { font-size: 4rem; font-weight: 900; line-height: 0.9; color: #3d3122; }
+    .position { font-size: 1.6rem; font-weight: 800; margin-top: 5px; color: #3d3122; }
+    .nation-flag { font-size: 2.2rem; margin: 5px 0; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
+    .club-logo { width: 45px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
+
+    /* 선수 사진 */
     .player-face {
-        width: 180px;
-        height: 180px;
+        width: 200px;
+        height: 200px;
         object-fit: contain;
-        margin-top: 10px;
-        filter: drop-shadow(5px 5px 5px rgba(0,0,0,0.3));
+        margin-left: 60px; /* 왼쪽 정보 공간 확보 */
+        filter: drop-shadow(8px 8px 10px rgba(0,0,0,0.4));
     }
 
-    /* 이름 */
+    /* 선수 이름 */
     .card-name {
-        font-size: 1.8rem;
+        font-family: 'Arial Black', sans-serif;
+        font-size: 2rem;
         font-weight: 900;
+        text-transform: uppercase;
         letter-spacing: 1px;
-        margin: 5px 0 10px 0;
-        border-bottom: 2px solid #cca164;
-        color: #333;
+        margin: 10px 0 15px 0;
+        color: #3d3122;
+        border-bottom: 3px solid #cba765;
+        display: inline-block;
+        padding-bottom: 5px;
     }
 
-    /* 스탯 그리드 (PAC, SHO, PAS...) */
+    /* 스탯 그리드 (수정됨: 가독성 향상) */
     .stats-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 5px 20px;
-        padding: 0 20px 20px 20px;
-        font-weight: bold;
-        font-size: 1.1rem;
-        color: #333;
+        grid-template-columns: 1fr 1fr; /* 2열 배치 */
+        gap: 8px 30px; /* 간격 조정 */
+        padding: 10px 30px;
+        font-weight: 800;
+        font-size: 1.2rem;
+        color: #3d3122; /* 진한 갈색으로 가독성 확보 */
+        text-align: left;
     }
-    .stat-row { display: flex; justify-content: space-between; }
-    .stat-val { font-weight: 900; }
-    
-    /* 애니메이션 키프레임 */
-    @keyframes popIn {
-        0% { transform: scale(0.1); opacity: 0; }
-        80% { transform: scale(1.05); opacity: 1; }
-        100% { transform: scale(1); }
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
-    
-    /* 워크아웃 효과 텍스트 */
-    .walkout-text {
-        font-size: 4rem;
-        font-weight: 900;
-        color: #f1c40f;
-        text-align: center;
-        text-shadow: 0 0 20px #f1c40f;
-        animation: flash 1s infinite alternate;
-    }
-    @keyframes flash { from { opacity: 0.5; } to { opacity: 1; } }
+    .stat-val { font-size: 1.3rem; font-weight: 900; margin-right: 8px; }
+    .stat-label { font-weight: normal; font-size: 1rem; opacity: 0.8; }
 
-    /* 버튼 스타일 */
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(90deg, #ff00cc, #333399);
-        color: white;
-        font-weight: bold;
-        font-size: 1.5rem;
-        padding: 15px;
-        border: none;
-        border-radius: 50px;
-        box-shadow: 0 0 20px rgba(255, 0, 204, 0.5);
+    /* 워크아웃 연출 텍스트 */
+    .walkout-step {
+        font-size: 5rem; font-weight: 900; color: #f1c40f; text-align: center;
+        text-shadow: 0 0 30px #f1c40f; animation: pulse 0.8s infinite alternate;
     }
-    .stButton>button:hover { transform: scale(1.05); }
+
+    @keyframes cardPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes pulse { from { opacity: 0.7; transform: scale(0.95); } to { opacity: 1; transform: scale(1.05); } }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 데이터 로직 (OVR 및 세부 스탯 생성) ---
-def generate_player_stats(name, dob):
-    seed_string = f"{name}{dob}"
-    hash_obj = hashlib.md5(seed_string.encode())
-    h = int(hash_obj.hexdigest(), 16)
+# --- 3. 데이터 생성 로직 ---
+def generate_player_data(name, dob):
+    seed = f"{name}{dob}"
+    h = int(hashlib.md5(seed.encode()).hexdigest(), 16)
     
-    # 포지션
-    positions = [("ST", "스트라이커"), ("LW", "윙어"), ("RW", "윙어"), ("CAM", "공미"), ("CM", "중미"), ("CDM", "수미"), ("CB", "센터백"), ("LB", "풀백"), ("RB", "풀백"), ("GK", "골키퍼")]
-    pos_code, _ = positions[h % len(positions)]
-    
-    # 구단
+    # 기본 데이터
+    positions = ["ST", "LW", "RW", "CAM", "CM", "CDM", "CB", "LB", "RB", "GK"]
+    flags = ["🇰🇷", "🇦🇷", "🇵🇹", "🇫🇷", "🇧🇷", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇩🇪", "🇪🇸", "🇮🇹", "🇳🇱"]
     teams = [
         ("Real Madrid", "https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg"),
         ("Man City", "https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg"),
@@ -139,135 +134,106 @@ def generate_player_stats(name, dob):
         ("PSG", "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg"),
         ("Liverpool", "https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg")
     ]
-    team_name, team_logo = teams[(h // 10) % len(teams)]
     
-    # 국적 (임의)
-    flags = ["🇰🇷", "🇦🇷", "🇵🇹", "🇫🇷", "🇧🇷", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇩🇪", "🇪🇸"]
-    flag = flags[(h // 5) % len(flags)]
+    # 해시 기반 선택
+    pos = positions[h % len(positions)]
+    flag = flags[(h // 7) % len(flags)]
+    team_name, team_logo = teams[(h // 13) % len(teams)]
     
-    # OVR (오버롤) - 최소 84 ~ 최대 99 (월드클래스 보장)
-    ovr = 84 + (h % 16)
+    # OVR 및 스탯 계산 (85~99 사이)
+    ovr = 85 + (h % 15)
+    base = ovr - 3
     
-    # 세부 스탯 생성 (포지션에 따라 가중치 부여)
     stats = {}
-    base = ovr - 5 # 기본 베이스
-    
-    if pos_code in ["ST", "LW", "RW"]:
-        stats = {"PAC": base+4, "SHO": base+5, "PAS": base-2, "DRI": base+3, "DEF": base-20, "PHY": base-5}
-    elif pos_code in ["CAM", "CM"]:
-        stats = {"PAC": base, "SHO": base, "PAS": base+5, "DRI": base+4, "DEF": base-5, "PHY": base-5}
-    elif pos_code in ["CDM", "CB", "LB", "RB"]:
-        stats = {"PAC": base-2, "SHO": base-15, "PAS": base, "DRI": base-5, "DEF": base+5, "PHY": base+5}
+    if pos in ["ST", "LW", "RW"]:
+        stats = {"PAC": base+3, "SHO": base+4, "PAS": base-1, "DRI": base+3, "DEF": base-25, "PHY": base-5}
+    elif pos in ["CAM", "CM", "CDM"]:
+        stats = {"PAC": base-2, "SHO": base, "PAS": base+4, "DRI": base+2, "DEF": base, "PHY": base}
+    elif pos in ["CB", "LB", "RB"]:
+        stats = {"PAC": base-1, "SHO": base-20, "PAS": base-3, "DRI": base-5, "DEF": base+5, "PHY": base+4}
     else: # GK
-        stats = {"DIV": base+2, "HAN": base+3, "KIC": base, "REF": base+4, "SPD": base-10, "POS": base+2}
-        
-    # 약간의 랜덤성 추가
-    for k in stats:
-        stats[k] = min(99, max(40, stats[k] + (h % 7) - 3))
+        stats = {"DIV": base+2, "HAN": base+2, "KIC": base, "REF": base+4, "SPD": base-15, "POS": base+2}
 
-    # 선수 실루엣 이미지 (워크아웃 느낌)
-    silhouette = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5Z3Z5/3o7TKy7hC4tH6qQe6Q/giphy.gif" # 임시 GIF
+    # 스탯 보정 (최대 99, 최소 50)
+    for k, v in stats:
+        stats[k] = min(99, max(50, v + (h % 5) - 2))
+        
+    # 선수 이미지
+    player_img = "https://cdn-icons-png.flaticon.com/512/3048/3048122.png"
     if ovr >= 90:
-        player_img = "https://cdn-icons-png.flaticon.com/512/3048/3048122.png" # 레전드 느낌
-    else:
-        player_img = "https://cdn-icons-png.flaticon.com/512/166/166344.png" # 일반 느낌
-        
-    return pos_code, team_logo, flag, ovr, stats, player_img
+        # 레전드급은 약간 다른 실루엣 적용 (예시)
+         player_img = "https://cdn-icons-png.flaticon.com/512/3048/3048127.png"
 
-# --- 4. 메인 UI ---
+    return pos, flag, team_logo, ovr, stats, player_img
 
-st.markdown("<h1 style='text-align: center; color: #f1c40f;'>FC 2026 ULTIMATE PACK</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #aaa;'>이름과 생일을 입력하고 팩을 개봉하세요!</p>", unsafe_allow_html=True)
+# --- 4. 메인 UI 및 연출 로직 ---
+st.markdown("<h1 style='text-align: center; color: #f1c40f; text-shadow: 0 0 20px #f1c40f;'>⚡ ULTIMATE FUT 26 PACK ⚡</h1>", unsafe_allow_html=True)
 
-# 입력 폼
 with st.container():
     c1, c2 = st.columns(2)
-    with c1:
-        name = st.text_input("Player Name", placeholder="SON HEUNG MIN")
-    with c2:
-        dob = st.date_input("Date of Birth", value=date(2000,1,1), min_value=date(1950,1,1))
+    name_input = c1.text_input("선수 이름 (ENG/KOR)", placeholder="예: SON Heung-min")
+    dob_input = c2.date_input("생년월일", value=date(2000, 1, 1))
+    
+    # 버튼 클릭 시 연출 시작
+    if st.button("🔥 PACK OPEN (팩 개봉) 🔥", type="primary"):
+        if not name_input:
+            st.error("이름을 입력해주세요!")
+        else:
+            # 1. 데이터 생성
+            pos, flag, team_logo, ovr, stats, player_img = generate_player_data(name_input, dob_input)
+            
+            # 2. [연출 시작] 터널 애니메이션 오버레이 주입
+            st.markdown('<div class="tunnel-overlay"></div>', unsafe_allow_html=True)
+            
+            # 3. 워크아웃 단계별 진행 (터널이 나오는 동안)
+            placeholder = st.empty()
+            
+            # 터널 진행 중... (약 2.5초 대기)
+            time.sleep(2.5)
+            
+            # 단계 1: 국기
+            placeholder.markdown(f"<div class='walkout-step'>{flag}</div>", unsafe_allow_html=True)
+            time.sleep(1.2)
+            
+            # 단계 2: 포지션
+            placeholder.markdown(f"<div class='walkout-step'>{pos}</div>", unsafe_allow_html=True)
+            time.sleep(1.2)
+            
+            # 단계 3: 소속팀 로고
+            placeholder.markdown(f"<div style='text-align:center;'><img src='{team_logo}' width='150'></div>", unsafe_allow_html=True)
+            time.sleep(1.2)
+            
+            # 4. [최종 공개] 기존 연출 지우고 카드 등장
+            placeholder.empty()
+            st.balloons()
+            
+            # 스탯 HTML 생성
+            stats_html = ""
+            if pos == "GK":
+                labels = [("DIV", stats["DIV"]), ("HAN", stats["HAN"]), ("KIC", stats["KIC"]),
+                          ("REF", stats["REF"]), ("SPD", stats["SPD"]), ("POS", stats["POS"])]
+            else:
+                labels = [("PAC", stats["PAC"]), ("SHO", stats["SHO"]), ("PAS", stats["PAS"]),
+                          ("DRI", stats["DRI"]), ("DEF", stats["DEF"]), ("PHY", stats["PHY"])]
+            
+            for label, val in labels:
+                stats_html += f"<div class='stat-row'><span class='stat-val'>{val}</span><span class='stat-label'>{label}</span></div>"
 
-    # 버튼: 상태 관리를 위해 콜백 대신 if문 처리
-    open_pack = st.button("⚡ OPEN PACK (팩 개봉) ⚡")
-
-# --- 5. 연출 및 결과 (Animation Logic) ---
-if open_pack and name:
-    # 1. 데이터 생성
-    pos, team_logo, flag, ovr, stats, player_img = generate_player_stats(name, dob)
-    
-    # 2. 워크아웃 애니메이션 (st.empty 사용)
-    placeholder = st.empty()
-    
-    # 단계 1: 터널/스포트라이트 GIF
-    with placeholder.container():
-        st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
-        # 터널 느낌의 GIF (외부 소스)
-        st.image("https://media.giphy.com/media/l41YtZOb9EUABfS9O/giphy.gif", caption="WALKOUT...", use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    time.sleep(2.5) # 긴장감 조성
-    
-    # 단계 2: 국기 등장
-    with placeholder.container():
-        st.markdown(f"<div class='walkout-text'>{flag}</div>", unsafe_allow_html=True)
-    time.sleep(1.0)
-    
-    # 단계 3: 포지션 등장
-    with placeholder.container():
-        st.markdown(f"<div class='walkout-text'>{pos}</div>", unsafe_allow_html=True)
-    time.sleep(1.0)
-    
-    # 단계 4: 소속팀 로고 등장
-    with placeholder.container():
-        st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
-        st.image(team_logo, width=150)
-        st.markdown("</div>", unsafe_allow_html=True)
-    time.sleep(1.2)
-    
-    # 단계 5: 쾅! 카드 공개 (Final Reveal)
-    placeholder.empty() # 기존 내용 지우기
-    st.balloons() # 축하 효과
-    
-    # 카드 HTML 렌더링
-    stats_html = ""
-    # 포지션이 GK가 아니면 일반 스탯
-    if pos != "GK":
-        s_keys = [("PAC", stats["PAC"]), ("SHO", stats["SHO"]), ("PAS", stats["PAS"]), 
-                  ("DRI", stats["DRI"]), ("DEF", stats["DEF"]), ("PHY", stats["PHY"])]
-    else:
-        s_keys = [("DIV", stats["DIV"]), ("HAN", stats["HAN"]), ("KIC", stats["KIC"]),
-                  ("REF", stats["REF"]), ("SPD", stats["SPD"]), ("POS", stats["POS"])]
-
-    for k, v in s_keys:
-        stats_html += f"<div class='stat-row'><span class='stat-val'>{v}</span> <span style='font-weight:normal;'>{k}</span></div>"
-
-    st.markdown(f"""
-    <div class="fut-card">
-        <div class="card-top">
-            <div style="display:flex; flex-direction:column; align-items:center; width: 60px;">
-                <span class="rating">{ovr}</span>
-                <span class="position">{pos}</span>
-                <span class="nation-flag">{flag}</span>
-                <img src="{team_logo}" class="club-logo">
+            # 최종 카드 렌더링
+            st.markdown(f"""
+            <div class="fut-card">
+                <div class="card-left-info">
+                    <span class="rating">{ovr}</span>
+                    <span class="position">{pos}</span>
+                    <span class="nation-flag">{flag}</span>
+                    <img src="{team_logo}" class="club-logo">
+                </div>
+                <img src="{player_img}" class="player-face">
+                
+                <div class="card-name">{name_input}</div>
+                
+                <div class="stats-grid">
+                    {stats_html}
+                </div>
             </div>
-            <img src="{player_img}" class="player-face" style="margin-left: 10px;">
-        </div>
-        
-        <div class="card-name">{name.upper()}</div>
-        
-        <div class="stats-grid">
-            {stats_html}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 하단 코멘트
-    time.sleep(0.5)
-    if ovr >= 90:
-        st.success("✨ WALKOUT! WORLD CLASS PLAYER! ✨")
-    elif ovr >= 86:
-        st.info("🔥 BOARDS! TOP TALENT! 🔥")
-    else:
-        st.warning("👍 GOOD PLAYER!")
-
-elif open_pack and not name:
-    st.error("Please enter a name first!")
+            """, unsafe_allow_html=True)
