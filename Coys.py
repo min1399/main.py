@@ -10,28 +10,30 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. CSS 스타일링 ---
+# --- 2. CSS 스타일링 (터널 주소 교체됨) ---
 st.markdown("""
     <style>
+    /* 전체 배경 */
     .stApp {
         background: radial-gradient(circle at center, #1a0f2e 0%, #0d0612 100%);
         color: white;
     }
 
-    /* 배경 터널 애니메이션 */
+    /* 🚀 핵심: 터널 애니메이션 (안정적인 Giphy 주소로 변경) */
     @keyframes tunnelFade {
         0% { opacity: 1; z-index: 9999; }
-        80% { opacity: 1; z-index: 9999; }
+        85% { opacity: 1; z-index: 9999; }
         100% { opacity: 0; z-index: -1; visibility: hidden; }
     }
 
     .tunnel-overlay {
         position: fixed;
         top: 0; left: 0; width: 100vw; height: 100vh;
-        background: url('https://i.pinimg.com/originals/a1/1f/65/a11f654296d4107462cd636967ecba0b.gif') no-repeat center center fixed;
+        /* 속도감 있는 터널/워프 효과 GIF */
+        background: url('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjZnYzJ4d3J5eXhpOHV4eXJ5eXhpOHV4eXJ5eXhpOHV4eXJ5eXhpOCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/YTU15FfQJMDWd9QeWz/giphy.gif') no-repeat center center fixed;
         background-size: cover;
         pointer-events: none;
-        animation: tunnelFade 3s forwards linear;
+        animation: tunnelFade 3.5s forwards linear; /* 3.5초 동안 유지 */
     }
 
     /* 카드 디자인 */
@@ -69,17 +71,20 @@ st.markdown("""
         color: #3d3122; border-bottom: 3px solid #cba765; display: inline-block; padding-bottom: 5px;
     }
 
+    /* 스탯 그리드 디자인 */
     .stats-grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 8px 30px;
+        display: grid; grid-template-columns: 1fr 1fr; gap: 5px 30px;
         padding: 10px 30px; font-weight: 800; font-size: 1.2rem; color: #3d3122; text-align: left;
     }
     .stat-row { display: flex; justify-content: space-between; align-items: center; }
     .stat-val { font-size: 1.3rem; font-weight: 900; margin-right: 8px; }
     .stat-label { font-weight: normal; font-size: 1rem; opacity: 0.8; }
 
+    /* 워크아웃 글자 효과 */
     .walkout-step {
         font-size: 5rem; font-weight: 900; color: #f1c40f; text-align: center;
         text-shadow: 0 0 30px #f1c40f; animation: pulse 0.8s infinite alternate;
+        padding-top: 20vh; /* 화면 중앙쯤에 위치하도록 */
     }
 
     @keyframes cardPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -87,7 +92,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 데이터 생성 로직 (수정됨) ---
+# --- 3. 데이터 생성 로직 ---
 def generate_player_data(name, dob):
     seed = f"{name}{dob}"
     h = int(hashlib.md5(seed.encode()).hexdigest(), 16)
@@ -120,7 +125,7 @@ def generate_player_data(name, dob):
     else: # GK
         stats = {"DIV": base+2, "HAN": base+2, "KIC": base, "REF": base+4, "SPD": base-15, "POS": base+2}
 
-    # 🔥 여기가 수정된 부분입니다 (.items() 추가) 🔥
+    # [수정완료] .items()를 사용하여 에러 해결!
     for k, v in stats.items():
         stats[k] = min(99, max(50, v + (h % 5) - 2))
         
@@ -138,31 +143,37 @@ with st.container():
     name_input = c1.text_input("Player Name (ENG/KOR)", placeholder="e.g. SON")
     dob_input = c2.date_input("Birth Date", value=date(2000, 1, 1))
     
-    if st.button("🔥 PACK OPEN 🔥", type="primary"):
+    if st.button("🔥 PACK OPEN (팩 개봉) 🔥", type="primary"):
         if not name_input:
             st.error("이름을 입력해주세요!")
         else:
             pos, flag, team_logo, ovr, stats, player_img = generate_player_data(name_input, dob_input)
             
-            # 터널 애니메이션 시작
+            # 1. 터널 애니메이션 시작 (화면 전체 덮기)
             st.markdown('<div class="tunnel-overlay"></div>', unsafe_allow_html=True)
             
             placeholder = st.empty()
-            time.sleep(2.5) # 터널 지속 시간과 맞춤
             
+            # 2. 터널 진행 중... (약 2.5초간)
+            time.sleep(2.5)
+            
+            # 3. 국기 등장!
             placeholder.markdown(f"<div class='walkout-step'>{flag}</div>", unsafe_allow_html=True)
-            time.sleep(1.2)
+            time.sleep(1.0)
             
+            # 4. 포지션 등장!
             placeholder.markdown(f"<div class='walkout-step'>{pos}</div>", unsafe_allow_html=True)
-            time.sleep(1.2)
+            time.sleep(1.0)
             
-            placeholder.markdown(f"<div style='text-align:center;'><img src='{team_logo}' width='150'></div>", unsafe_allow_html=True)
-            time.sleep(1.2)
+            # 5. 소속팀 등장!
+            placeholder.markdown(f"<div class='walkout-step'><img src='{team_logo}' width='150'></div>", unsafe_allow_html=True)
+            time.sleep(1.0)
             
+            # 6. 최종 카드 공개
             placeholder.empty()
             st.balloons()
             
-            # 스탯 HTML 만들기
+            # 스탯 HTML 조립
             stats_html = ""
             if pos == "GK":
                 labels = [("DIV", stats["DIV"]), ("HAN", stats["HAN"]), ("KIC", stats["KIC"]),
@@ -174,7 +185,7 @@ with st.container():
             for label, val in labels:
                 stats_html += f"<div class='stat-row'><span class='stat-val'>{val}</span><span class='stat-label'>{label}</span></div>"
 
-            # 카드 출력
+            # 카드 HTML 출력
             st.markdown(f"""
             <div class="fut-card">
                 <div class="card-left-info">
