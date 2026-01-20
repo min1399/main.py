@@ -1,253 +1,231 @@
 import streamlit as st
 import hashlib
-import time
-from datetime import date
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
-    page_title="FC 2026 PACK OPENING",
+    page_title="2025 TEAM LINEUP",
     page_icon="⚽",
-    layout="centered"
+    layout="wide" # 넓은 화면 사용
 )
 
-# --- 2. CSS 스타일링 (입력 막힘 해결 + 걸어나오는 효과) ---
+# --- 2. 스타일 (CSS) - 전술판 및 유니폼 디자인 ---
 st.markdown("""
     <style>
-    /* 전체 배경: 칠흑 같은 어둠 + 별 */
+    /* 전체 폰트 */
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700&display=swap');
+    
     .stApp {
-        background-color: #050505;
+        background-color: #1a1a1a;
         color: white;
     }
 
-    /* 🛑 핵심 수정: 배경 요소가 클릭을 방해하지 않도록 설정 (pointer-events: none) */
-    .background-effect {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        pointer-events: none; /* 클릭 통과! 중요! */
-        z-index: 0;
-    }
-
-    /* 배경 별빛 애니메이션 */
-    @keyframes move-stars {
-        from {background-position:0 0;}
-        to {background-position:-10000px 5000px;}
-    }
-    .stars {
-        background: #000 url(http://www.script-tutorials.com/demos/360/images/stars.png) repeat top center;
-        opacity: 0.8;
-    }
-    .twinkling {
-        background: transparent url(http://www.script-tutorials.com/demos/360/images/twinkling.png) repeat top center;
-        animation: move-stars 200s linear infinite;
-        opacity: 0.5;
-    }
-
-    /* 🚶‍♂️ 사람이 걸어나오는 효과 (줌인 + 페이드인) */
-    @keyframes walkOutAnimation {
-        0% {
-            transform: scale(0.2) translateY(500px); /* 작고 아래쪽에 있음 */
-            opacity: 0;
-            filter: brightness(0); /* 어두운 실루엣 */
-        }
-        30% {
-            opacity: 1;
-            filter: brightness(0.2); /* 서서히 보임 */
-        }
-        100% {
-            transform: scale(1) translateY(0); /* 원래 크기 */
-            opacity: 1;
-            filter: brightness(1); /* 완전히 밝아짐 */
-        }
-    }
-
-    /* 카드 컨테이너 */
-    .walkout-container {
-        display: flex;
-        justify-content: center;
-        margin-top: 50px;
-        perspective: 1000px; /* 3D 효과 */
-    }
-
-    .fut-card {
-        width: 320px;
-        background: linear-gradient(180deg, #f8e6b8 0%, #eacda3 80%, #d4af37 100%);
-        border: 4px solid #f1c40f;
-        border-radius: 25px;
-        padding: 15px;
-        text-align: center;
-        box-shadow: 0 0 50px rgba(241, 196, 15, 0.5);
+    /* 🏟️ 축구장 (전술판) 스타일 - 순수 CSS 구현 */
+    .pitch-container {
         position: relative;
-        
-        /* 여기가 핵심: 애니메이션 적용 */
-        animation: walkOutAnimation 3s cubic-bezier(0.19, 1, 0.22, 1) forwards;
-        z-index: 10;
+        width: 100%;
+        max-width: 600px;
+        aspect-ratio: 2/3; /* 세로형 축구장 비율 */
+        margin: 0 auto;
+        background: repeating-linear-gradient(
+            0deg,
+            #2e7d32,
+            #2e7d32 10%,
+            #388e3c 10%,
+            #388e3c 20%
+        );
+        border: 2px solid white;
+        border-radius: 5px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        overflow: hidden;
     }
 
-    /* 카드 내부 요소들 */
-    .card-top {
-        display: flex;
-        align-items: flex-start;
-        margin-bottom: 10px;
+    /* 경기장 라인 */
+    .line { position: absolute; border: 2px solid rgba(255,255,255,0.7); }
+    .center-circle { 
+        top: 50%; left: 50%; width: 100px; height: 100px; 
+        border-radius: 50%; transform: translate(-50%, -50%); 
     }
-    .info-col {
+    .half-line { top: 50%; width: 100%; height: 2px; background: rgba(255,255,255,0.7); border:none; }
+    .penalty-box-top { top: 0; left: 50%; width: 60%; height: 15%; transform: translateX(-50%); border-top: none; }
+    .penalty-box-bottom { bottom: 0; left: 50%; width: 60%; height: 15%; transform: translateX(-50%); border-bottom: none; }
+
+    /* 👕 선수 아이콘 (유니폼) */
+    .player-marker {
+        position: absolute;
+        transform: translate(-50%, -50%);
         display: flex;
         flex-direction: column;
         align-items: center;
-        width: 70px;
-    }
-    .rating { font-size: 3.5rem; font-weight: 900; line-height: 1; color: #3d3122; }
-    .position { font-size: 1.5rem; font-weight: 800; color: #3d3122; margin-bottom: 5px; }
-    .nation-flag { font-size: 2rem; margin-bottom: 5px; }
-    
-    .player-img {
-        width: 180px;
-        height: 180px;
-        object-fit: contain;
-        margin-left: 20px;
-        filter: drop-shadow(5px 5px 10px rgba(0,0,0,0.4));
-    }
-
-    .card-name {
-        font-family: 'Arial Black', sans-serif;
-        font-size: 2rem;
-        font-weight: 900;
-        text-transform: uppercase;
-        border-bottom: 3px solid #cba765;
-        margin: 10px 0;
-        color: #3d3122;
-    }
-
-    .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 5px 20px;
-        font-weight: 900;
-        color: #3d3122;
-        font-size: 1.1rem;
-    }
-    
-    /* 워크아웃 텍스트 (국기, 포지션 등) */
-    .step-text {
-        font-size: 5rem;
-        font-weight: 900;
-        color: #f1c40f;
+        width: 80px;
         text-align: center;
-        position: fixed;
-        top: 40%; left: 0; right: 0;
-        text-shadow: 0 0 30px #f1c40f;
-        z-index: 999;
-        animation: pop 0.5s ease-out;
+        transition: all 0.3s;
     }
-    @keyframes pop { from {transform: scale(0);} to {transform: scale(1);} }
-
-    /* 입력 폼 스타일 (확실히 클릭되게) */
-    .stTextInput, .stDateInput, .stButton {
-        position: relative;
-        z-index: 50 !important; /* 배경보다 무조건 위에 */
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 3. 배경 깔기 (클릭 방지 적용됨) ---
-st.markdown('<div class="background-effect stars"></div><div class="background-effect twinkling"></div>', unsafe_allow_html=True)
-
-# --- 4. 데이터 로직 ---
-def generate_data(name, dob):
-    seed = f"{name}{dob}"
-    h = int(hashlib.md5(seed.encode()).hexdigest(), 16)
     
-    positions = ["ST", "LW", "RW", "CAM", "CM", "CDM", "CB", "LB", "RB", "GK"]
-    flags = ["🇰🇷", "🇦🇷", "🇵🇹", "🇫🇷", "🇧🇷", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇩🇪", "🇪🇸", "🇮🇹", "🇳🇱"]
-    teams = [
-        ("https://upload.wikimedia.org/wikipedia/en/5/56/Real_Madrid_CF.svg"),
-        ("https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg"),
-        ("https://upload.wikimedia.org/wikipedia/commons/1/1b/FC_Bayern_M%C3%BCnchen_logo_%282017%29.svg"),
-        ("https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg"),
-        ("https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg")
+    /* 유니폼 원형 */
+    .jersey-circle {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background: #f44336; /* 기본 팀 컬러 (빨강) */
+        border: 2px solid white;
+        display: flex; justify-content: center; align-items: center;
+        color: white; font-weight: bold; font-size: 1.2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    
+    /* 내 선수 강조 스타일 */
+    .my-player .jersey-circle {
+        background: #FFD700; /* 골드 */
+        color: #000;
+        width: 50px; height: 50px; font-size: 1.5rem;
+        border: 3px solid #fff;
+        box-shadow: 0 0 15px #FFD700;
+        animation: pulse 1.5s infinite;
+    }
+
+    /* 이름표 */
+    .player-name {
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        margin-top: 5px;
+        font-family: 'Roboto', sans-serif;
+        white-space: nowrap;
+    }
+    .my-player .player-name {
+        background: #FFD700;
+        color: black;
+        font-weight: bold;
+        font-size: 1rem;
+    }
+
+    /* 포지션 텍스트 */
+    .pos-label { font-size: 0.7rem; color: #ddd; margin-top: -2px; }
+
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- 3. 로직: 이름에 따른 포지션 배정 ---
+def get_lineup_data(name):
+    # 이름을 해시값으로 변환하여 고정된 결과 생성
+    hash_val = int(hashlib.md5(name.encode()).hexdigest(), 16)
+    
+    # 4-3-3 포메이션 좌표 (Top%, Left%) - 위쪽이 공격
+    formation = [
+        {"pos": "GK",  "top": 90, "left": 50, "no": 1},
+        {"pos": "LB",  "top": 75, "left": 15, "no": 3},
+        {"pos": "CB",  "top": 75, "left": 38, "no": 4},
+        {"pos": "CB",  "top": 75, "left": 62, "no": 5},
+        {"pos": "RB",  "top": 75, "left": 85, "no": 2},
+        {"pos": "CM",  "top": 55, "left": 30, "no": 8},
+        {"pos": "CDM", "top": 60, "left": 50, "no": 6},
+        {"pos": "CM",  "top": 55, "left": 70, "no": 10},
+        {"pos": "LW",  "top": 25, "left": 20, "no": 7},
+        {"pos": "ST",  "top": 20, "left": 50, "no": 9},
+        {"pos": "RW",  "top": 25, "left": 80, "no": 11},
     ]
     
-    pos = positions[h % len(positions)]
-    flag = flags[(h // 7) % len(flags)]
-    team_logo = teams[(h // 13) % len(teams)]
-    ovr = 86 + (h % 14) # 86 ~ 99
+    # 내 포지션 결정 (11개 중 하나)
+    my_idx = hash_val % 11
     
-    # 선수 실루엣 이미지 (기본: 남자 선수 아이콘)
-    player_img = "https://cdn-icons-png.flaticon.com/512/3048/3048122.png"
+    # 가상의 팀원 이름들
+    teammates = ["De Gea", "Davies", "Van Dijk", "Saliba", "Walker", "KDB", "Rodri", "Bellingham", "Vinicius", "Haaland", "Salah"]
     
-    # 스탯 생성
-    base = ovr - 3
-    stats = {}
-    if pos == "GK":
-         stats = {"DIV": base, "HAN": base+2, "KIC": base-5, "REF": base+3, "SPD": base-10, "POS": base}
-    else:
-         stats = {"PAC": base+2, "SHO": base+1, "PAS": base, "DRI": base+2, "DEF": base-10, "PHY": base-5}
-         
-    for k, v in stats.items():
-        stats[k] = min(99, max(60, v))
+    # 데이터 조립
+    players = []
+    for i, spot in enumerate(formation):
+        is_me = (i == my_idx)
+        player_name = name if is_me else teammates[i]
         
-    return pos, flag, team_logo, ovr, stats, player_img
-
-# --- 5. 메인 UI ---
-st.markdown("<h1 style='text-align: center; color: #f1c40f;'>⚡ FC 26 ULTIMATE PACK ⚡</h1>", unsafe_allow_html=True)
-
-# 입력 폼 (컨테이너 사용)
-with st.container():
-    c1, c2 = st.columns(2)
-    name = c1.text_input("Player Name (이름)", placeholder="SON")
-    dob = c2.date_input("Birth Date (생일)", value=date(2000, 1, 1))
+        players.append({
+            "name": player_name,
+            "pos": spot["pos"],
+            "top": spot["top"],
+            "left": spot["left"],
+            "no": spot["no"],
+            "is_me": is_me
+        })
+        
+    # 팀 정보 (해시값 기반 랜덤)
+    teams = ["Manchester City", "Real Madrid", "Arsenal", "Liverpool", "Bayern Munich"]
+    my_team = teams[hash_val % len(teams)]
     
-    btn = st.button("🔥 PACK OPEN (팩 개봉) 🔥", type="primary", use_container_width=True)
+    return players, my_team, players[my_idx] # 전체선수, 팀명, 내정보
 
-# 버튼 클릭 시 실행
-if btn:
-    if not name:
-        st.error("이름을 입력해주세요!")
-    else:
-        # 데이터 생성
-        pos, flag, team_logo, ovr, stats, player_img = generate_data(name, dob)
-        
-        # --- 워크아웃 연출 (단계별 텍스트) ---
-        placeholder = st.empty()
-        
-        # 1. 국기 쿵!
-        placeholder.markdown(f"<div class='step-text'>{flag}</div>", unsafe_allow_html=True)
-        time.sleep(1.0)
-        
-        # 2. 포지션 쿵!
-        placeholder.markdown(f"<div class='step-text'>{pos}</div>", unsafe_allow_html=True)
-        time.sleep(1.0)
-        
-        # 3. 로고 쿵!
-        placeholder.markdown(f"<div class='step-text'><img src='{team_logo}' width='150'></div>", unsafe_allow_html=True)
-        time.sleep(1.0)
-        
-        # 4. 화면 비우고 카드 등장 (걸어나오는 애니메이션)
-        placeholder.empty()
-        st.balloons()
-        
-        # 스탯 HTML 만들기
-        stats_html = ""
-        for k, v in stats.items():
-            stats_html += f"<div style='display:flex; justify-content:space-between;'><span>{v}</span><span style='opacity:0.7;'>{k}</span></div>"
+# --- 4. 메인 화면 UI ---
 
-        # 최종 카드 출력 (애니메이션 클래스 포함)
+col1, col2 = st.columns([1, 2])
+
+# 왼쪽: 입력란
+with col1:
+    st.markdown("### 📋 SCOUTING REPORT")
+    st.info("이름을 입력하면 25/26 시즌 선발 라인업에서의 당신의 위치를 보여줍니다.")
+    
+    input_name = st.text_input("선수 이름 입력", placeholder="예: 손흥민")
+    
+    btn = st.button("라인업 확인하기", type="primary", use_container_width=True)
+
+    if btn and input_name:
+        players, team_name, my_info = get_lineup_data(input_name)
+        
+        st.markdown("---")
+        st.success(f"✅ **{team_name}** 입단 확정!")
+        
+        # 내 스탯 표시 (카드 형태)
         st.markdown(f"""
-        <div class="walkout-container">
-            <div class="fut-card">
-                <div class="card-top">
-                    <div class="info-col">
-                        <span class="rating">{ovr}</span>
-                        <span class="position">{pos}</span>
-                        <span class="nation-flag">{flag}</span>
-                        <img src="{team_logo}" width="40">
-                    </div>
-                    <img src="{player_img}" class="player-img">
-                </div>
-                
-                <div class="card-name">{name}</div>
-                <div class="stats-grid">
-                    {stats_html}
-                </div>
+        <div style="background:#333; padding:20px; border-radius:10px; border-left: 5px solid #FFD700;">
+            <h2 style="margin:0; color:#FFD700;">{my_info['name']}</h2>
+            <p style="color:#aaa; margin:0;">No. {my_info['no']} | {my_info['pos']}</p>
+            <hr style="border-color:#555;">
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                <span>OVR (평점)</span>
+                <span style="color:#4CAF50;">{(85 + len(input_name)) % 15 + 85}</span>
             </div>
+            <div style="margin-top:10px; font-size:0.9rem; color:#ccc;">
+                "감독이 당신을 <strong>{my_info['pos']}</strong> 포지션의 핵심으로 낙점했습니다."
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# 오른쪽: 전술판 (항상 표시되거나 버튼 클릭시 갱신)
+with col2:
+    if btn and input_name:
+        players, team_name, my_info = get_lineup_data(input_name)
+        
+        # HTML로 전술판 그리기
+        players_html = ""
+        for p in players:
+            extra_class = "my-player" if p["is_me"] else ""
+            players_html += f"""
+            <div class="player-marker {extra_class}" style="top: {p['top']}%; left: {p['left']}%;">
+                <div class="jersey-circle">{p['no']}</div>
+                <div class="player-name">{p['name']}</div>
+                <div class="pos-label">{p['pos']}</div>
+            </div>
+            """
+            
+        st.markdown(f"""
+        <div style="text-align:center; margin-bottom:10px;">
+            <h2 style="color:white; letter-spacing:2px;">STARTING XI</h2>
+            <div style="color:#aaa;">{team_name} vs All-Stars</div>
+        </div>
+        
+        <div class="pitch-container">
+            <div class="line center-circle"></div>
+            <div class="line half-line"></div>
+            <div class="line penalty-box-top"></div>
+            <div class="line penalty-box-bottom"></div>
+            
+            {players_html}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    else:
+        # 대기 화면 (빈 전술판)
+        st.markdown("""
+        <div class="pitch-container" style="opacity:0.5; display:flex; justify-content:center; align-items:center;">
+             <h3 style="color:white;">WAITING FOR PLAYER...</h3>
         </div>
         """, unsafe_allow_html=True)
