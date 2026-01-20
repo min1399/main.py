@@ -2,6 +2,7 @@ import streamlit as st
 import hashlib
 import time
 from datetime import date
+import streamlit.components.v1 as components
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
@@ -10,52 +11,144 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. CSS 스타일링 (이미지 없이 코드로 구현) ---
+# --- 2. 🚀 핵심 기술: 자바스크립트(JS)로 만든 3D 워프 애니메이션 ---
+# 이 코드는 외부 이미지가 아니라, 사용자의 브라우저에서 실시간으로 그래픽을 그려냅니다.
+def warp_animation_code():
+    return """
+    <canvas id="warpCanvas"></canvas>
+    <script>
+    document.body.style.overflow = 'hidden'; // 스크롤 방지
+    const canvas = document.getElementById('warpCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 캔버스를 화면 전체로 설정
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.zIndex = '9998'; // 텍스트보다 뒤, 배경보다 앞
+    canvas.style.background = 'black';
+    
+    let width, height;
+    let stars = [];
+    const numStars = 600; // 별의 개수 (많을수록 화려함)
+    const speed = 25; // 속도 (빠를수록 박진감 넘침)
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        
+        // 캔버스 중심 설정
+        ctx.translate(width / 2, height / 2);
+    }
+    
+    class Star {
+        constructor() {
+            this.reset();
+        }
+        reset() {
+            this.x = (Math.random() - 0.5) * width * 2;
+            this.y = (Math.random() - 0.5) * height * 2;
+            this.z = Math.random() * width; // 깊이감
+            this.pz = this.z;
+        }
+        update() {
+            this.z = this.z - speed;
+            if (this.z < 1) {
+                this.reset();
+                this.z = width;
+                this.pz = this.z;
+            }
+        }
+        show() {
+            let sx = (this.x / this.z) * width;
+            let sy = (this.y / this.z) * height;
+            
+            let px = (this.x / this.pz) * width;
+            let py = (this.y / this.pz) * height;
+            
+            this.pz = this.z;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255, 255, 255, " + (1 - this.z / width) + ")";
+            ctx.lineWidth = (1 - this.z / width) * 4; // 가까울수록 두껍게
+            ctx.moveTo(px, py);
+            ctx.lineTo(sx, sy);
+            ctx.stroke();
+        }
+    }
+
+    function init() {
+        resize();
+        stars = [];
+        for (let i = 0; i < numStars; i++) {
+            stars.push(new Star());
+        }
+        animate();
+    }
+
+    function animate() {
+        // 꼬리 잔상 효과를 위해 약간 투명한 검은색으로 덮음
+        ctx.fillStyle = "rgba(0, 0, 0, 0.4)"; 
+        ctx.fillRect(-width/2, -height/2, width, height);
+        
+        for (let star of stars) {
+            star.update();
+            star.show();
+        }
+        requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('resize', resize);
+    init();
+    
+    // 5초 뒤에 자동으로 사라지게 설정 (파이썬 로직과 싱크 맞춤)
+    setTimeout(() => {
+        canvas.style.transition = 'opacity 1s ease';
+        canvas.style.opacity = '0';
+        setTimeout(() => { canvas.remove(); }, 1000);
+    }, 4500);
+    </script>
+    """
+
+# --- 3. CSS 스타일링 (카드 및 텍스트) ---
 st.markdown("""
     <style>
-    /* 전체 배경: 어두운 우주 느낌 */
+    /* 기본 배경 */
     .stApp {
-        background: radial-gradient(circle at center, #000000 0%, #1a0f2e 50%, #0d0612 100%);
+        background: radial-gradient(circle at center, #111 0%, #000 100%);
         color: white;
     }
 
-    /* 🚀 핵심: 순수 CSS로 만든 터널/워프 효과 */
-    @keyframes warpEffect {
-        0% { transform: scale(1); opacity: 0; }
-        10% { opacity: 1; }
-        80% { opacity: 1; }
-        100% { transform: scale(4); opacity: 0; }
-    }
-    
-    @keyframes flash {
-        0%, 100% { opacity: 0; }
-        50% { opacity: 0.8; }
-    }
-
-    .tunnel-overlay {
+    /* 워크아웃 텍스트 (화면 중앙, 아주 크게) */
+    .walkout-container {
         position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        z-index: 9999;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 9999; /* 워프 효과보다 더 앞에 */
+        text-align: center;
+        width: 100%;
         pointer-events: none;
-        /* 중앙에서 빛이 뿜어져 나오는듯한 그래디언트 */
-        background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(255,215,0,0.2) 40%, rgba(255,100,0,0.6) 80%, rgba(0,0,0,1) 100%);
-        /* 점점 커지면서 다가오는 애니메이션 */
-        animation: warpEffect 3.5s ease-in-out forwards;
-        display: flex;
-        justify-content: center;
-        align-items: center;
     }
     
-    /* 추가적인 번쩍임 효과 */
-    .tunnel-overlay::after {
-        content: '';
-        position: absolute;
-        width: 100%; height: 100%;
-        background: white;
-        animation: flash 0.5s 3 ease-in-out; /* 3번 번쩍임 */
-        opacity: 0;
+    .walkout-text {
+        font-family: 'Arial Black', sans-serif;
+        font-size: 7rem;
+        font-weight: 900;
+        color: #fff;
+        text-transform: uppercase;
+        text-shadow: 0 0 20px #f1c40f, 0 0 50px #f1c40f;
+        animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-
+    
+    .walkout-img {
+        width: 250px;
+        filter: drop-shadow(0 0 40px #fff);
+        animation: zoomIn 0.5s;
+    }
 
     /* 카드 디자인 */
     .fut-card {
@@ -69,7 +162,7 @@ st.markdown("""
         box-shadow: 0 0 60px rgba(241, 196, 15, 0.6), inset 0 0 20px rgba(255,255,255,0.5);
         text-align: center;
         position: relative;
-        animation: cardPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        animation: cardReveal 1s ease-out;
         z-index: 1;
     }
 
@@ -81,59 +174,33 @@ st.markdown("""
     .position { font-size: 1.6rem; font-weight: 800; margin-top: 5px; color: #3d3122; }
     .nation-flag { font-size: 2.2rem; margin: 5px 0; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
     .club-logo { width: 45px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
-
+    
     .player-face {
         width: 200px; height: 200px; object-fit: contain; margin-left: 60px;
         filter: drop-shadow(8px 8px 10px rgba(0,0,0,0.4));
     }
-
+    
     .card-name {
         font-family: 'Arial Black', sans-serif; font-size: 2rem; font-weight: 900;
         text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 15px 0;
         color: #3d3122; border-bottom: 3px solid #cba765; display: inline-block; padding-bottom: 5px;
     }
-
-    /* 스탯 그리드 디자인 */
+    
     .stats-grid {
         display: grid; grid-template-columns: 1fr 1fr; gap: 5px 30px;
         padding: 10px 30px; font-weight: 800; font-size: 1.2rem; color: #3d3122; text-align: left;
     }
-    .stat-row { display: flex; justify-content: space-between; align-items: center; }
-    .stat-val { font-size: 1.3rem; font-weight: 900; margin-right: 8px; }
-    .stat-label { font-weight: normal; font-size: 1rem; opacity: 0.8; }
-
-    /* 워크아웃 글자 효과 (화면 중앙 정렬) */
-    .walkout-container {
-        position: fixed;
-        top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 10000; /* 터널보다 위에 */
-        text-align: center;
-        width: 100%;
-    }
-    .walkout-step {
-        font-size: 6rem; font-weight: 900; color: #f1c40f;
-        text-shadow: 0 0 50px #f1c40f, 0 0 20px white;
-        animation: pulse 0.8s infinite alternate;
-    }
-    .walkout-img {
-        width: 200px;
-        filter: drop-shadow(0 0 30px #f1c40f);
-        animation: pulse 0.8s infinite alternate;
-    }
-
-
-    @keyframes cardPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    @keyframes pulse { from { opacity: 0.7; transform: scale(0.95); } to { opacity: 1; transform: scale(1.05); } }
+    
+    @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes cardReveal { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 데이터 생성 로직 ---
+# --- 4. 데이터 로직 ---
 def generate_player_data(name, dob):
     seed = f"{name}{dob}"
     h = int(hashlib.md5(seed.encode()).hexdigest(), 16)
     
-    # 기본 데이터
     positions = ["ST", "LW", "RW", "CAM", "CM", "CDM", "CB", "LB", "RB", "GK"]
     flags = ["🇰🇷", "🇦🇷", "🇵🇹", "🇫🇷", "🇧🇷", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇩🇪", "🇪🇸", "🇮🇹", "🇳🇱"]
     teams = [
@@ -158,10 +225,9 @@ def generate_player_data(name, dob):
         stats = {"PAC": base-2, "SHO": base, "PAS": base+4, "DRI": base+2, "DEF": base, "PHY": base}
     elif pos in ["CB", "LB", "RB"]:
         stats = {"PAC": base-1, "SHO": base-20, "PAS": base-3, "DRI": base-5, "DEF": base+5, "PHY": base+4}
-    else: # GK
+    else: 
         stats = {"DIV": base+2, "HAN": base+2, "KIC": base, "REF": base+4, "SPD": base-15, "POS": base+2}
 
-    # 스탯 계산
     for k, v in stats.items():
         stats[k] = min(99, max(50, v + (h % 5) - 2))
         
@@ -171,58 +237,58 @@ def generate_player_data(name, dob):
 
     return pos, flag, team_logo, ovr, stats, player_img
 
-# --- 4. 메인 UI ---
-st.markdown("<h1 style='text-align: center; color: #f1c40f; text-shadow: 0 0 20px #f1c40f;'>⚡ ULTIMATE FUT 26 PACK ⚡</h1>", unsafe_allow_html=True)
+# --- 5. 메인 UI ---
+st.markdown("<h1 style='text-align: center; color: #f1c40f; text-shadow: 0 0 20px #f1c40f;'>🚀 HYPER WARP PACK 🚀</h1>", unsafe_allow_html=True)
 
 with st.container():
     c1, c2 = st.columns(2)
-    name_input = c1.text_input("Player Name (ENG/KOR)", placeholder="e.g. SON")
+    name_input = c1.text_input("Player Name", placeholder="SON")
     dob_input = c2.date_input("Birth Date", value=date(2000, 1, 1))
     
-    if st.button("🔥 PACK OPEN (팩 개봉) 🔥", type="primary"):
+    if st.button("🔥 워프 엔진 가동 (팩 개봉) 🔥", type="primary"):
         if not name_input:
             st.error("이름을 입력해주세요!")
         else:
+            # 1. 데이터 생성
             pos, flag, team_logo, ovr, stats, player_img = generate_player_data(name_input, dob_input)
             
-            # 1. [핵심] 순수 CSS로 만든 터널 효과 시작
-            st.markdown('<div class="tunnel-overlay"></div>', unsafe_allow_html=True)
+            # 2. [핵심] 3D 워프 애니메이션 자바스크립트 주입
+            # components.html을 사용하지 않고 markdown으로 직접 넣어야 전체 화면에 적용됨
+            st.markdown(warp_animation_code(), unsafe_allow_html=True)
             
             placeholder = st.empty()
             
-            # 터널 진행 중... (긴장감 조성)
-            time.sleep(2.5)
+            # 3. 워프 진행 중... 텍스트 연출 (싱크 맞춤)
+            time.sleep(1.0) # 속도감 증가
             
-            # 2. 워크아웃 단계별 정보 표시 (화면 중앙)
             # 국기
-            placeholder.markdown(f"<div class='walkout-container'><div class='walkout-step'>{flag}</div></div>", unsafe_allow_html=True)
+            placeholder.markdown(f"<div class='walkout-container'><div class='walkout-text'>{flag}</div></div>", unsafe_allow_html=True)
             time.sleep(1.0)
             
             # 포지션
-            placeholder.markdown(f"<div class='walkout-container'><div class='walkout-step'>{pos}</div></div>", unsafe_allow_html=True)
+            placeholder.markdown(f"<div class='walkout-container'><div class='walkout-text'>{pos}</div></div>", unsafe_allow_html=True)
             time.sleep(1.0)
             
-            # 소속팀
+            # 구단 로고
             placeholder.markdown(f"<div class='walkout-container'><img src='{team_logo}' class='walkout-img'></div>", unsafe_allow_html=True)
             time.sleep(1.2)
             
-            # 3. 최종 카드 공개
-            placeholder.empty()
+            # 4. 카드 최종 공개
+            placeholder.empty() # 텍스트 지움
+            # (캔버스는 자바스크립트가 알아서 4.5초 뒤에 사라짐)
+            
             st.balloons()
             
-            # 스탯 HTML 조립
+            # 카드 렌더링
             stats_html = ""
             if pos == "GK":
-                labels = [("DIV", stats["DIV"]), ("HAN", stats["HAN"]), ("KIC", stats["KIC"]),
-                          ("REF", stats["REF"]), ("SPD", stats["SPD"]), ("POS", stats["POS"])]
+                labels = [("DIV", stats["DIV"]), ("HAN", stats["HAN"]), ("KIC", stats["KIC"]), ("REF", stats["REF"]), ("SPD", stats["SPD"]), ("POS", stats["POS"])]
             else:
-                labels = [("PAC", stats["PAC"]), ("SHO", stats["SHO"]), ("PAS", stats["PAS"]),
-                          ("DRI", stats["DRI"]), ("DEF", stats["DEF"]), ("PHY", stats["PHY"])]
+                labels = [("PAC", stats["PAC"]), ("SHO", stats["SHO"]), ("PAS", stats["PAS"]), ("DRI", stats["DRI"]), ("DEF", stats["DEF"]), ("PHY", stats["PHY"])]
             
             for label, val in labels:
-                stats_html += f"<div class='stat-row'><span class='stat-val'>{val}</span><span class='stat-label'>{label}</span></div>"
+                stats_html += f"<div style='display:flex; justify-content:space-between;'><span style='font-weight:900; font-size:1.3rem;'>{val}</span><span style='font-size:1rem; opacity:0.8;'>{label}</span></div>"
 
-            # 카드 HTML 출력
             st.markdown(f"""
             <div class="fut-card">
                 <div class="card-left-info">
